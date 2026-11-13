@@ -77,6 +77,16 @@
         .col-role-ens { width: 16% !important; }
         .col-role-app { width: 16% !important; }
 
+        /* تنسيق الخلايا القابلة للتعديل في المعاينة */
+        [contenteditable="true"] {
+            outline: none;
+            transition: background-color 0.2s ease;
+        }
+        [contenteditable="true"]:focus {
+            background-color: #faf5ff !important;
+            box-shadow: inset 0 0 0 1.5px #9333EA;
+        }
+
         /* الألوان والبيداغوجيا المطلوبة بدقة مع الرجوع الإجباري للسطر */
         .ped-rule { color: #9333EA !important; font-weight: bold; display: block; margin-top: 6px; }
         .ped-prop { color: #EA580C !important; font-weight: bold; display: block; margin-top: 6px; }
@@ -104,13 +114,49 @@
 
         @media print {
             .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; margin: 0 !important; }
-            .print-container { width: 100% !important; margin: 0 !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+            
+            /* إلغاء القيود التي تسبب قص الفقرة الأخيرة في الطباعة */
+            html, body {
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                display: block !important;
+            }
+
+            #generatorApp, main, section {
+                display: block !important;
+                height: auto !important;
+                overflow: visible !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .print-container { 
+                width: 100% !important; 
+                margin: 0 !important; 
+                box-shadow: none !important; 
+                border: none !important; 
+                padding: 0 !important;
+                overflow: visible !important;
+                display: block !important;
+            }
+
             @page { size: A4 portrait; margin: 8mm; }
             
             .fiche-table {
                 width: 100% !important;
                 table-layout: fixed !important;
+                page-break-inside: auto !important;
+            }
+
+            .fiche-table tr {
+                page-break-inside: auto !important;
+                page-break-after: auto !important;
             }
 
             .fiche-table th, .fiche-table td { 
@@ -118,7 +164,9 @@
                 line-height: 1.35 !important;
                 padding: 4px 3px !important;
                 word-break: break-word !important;
-                overflow: hidden !important;
+                overflow: visible !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
             }
 
             .col-seance { width: 8% !important; }
@@ -127,7 +175,6 @@
             .col-role-ens { width: 16% !important; }
             .col-role-app { width: 16% !important; }
 
-            /* إصلاح تداخل المعادلات والرموز الرياضية ومحاذاة السطر في الطباعة */
             mjx-container {
                 max-width: 100% !important;
                 white-space: normal !important;
@@ -137,7 +184,8 @@
 
             .figure-wrapper {
                 max-width: 100% !important;
-                page-break-inside: avoid;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
 
             .detected-figure {
@@ -187,7 +235,7 @@
 <body class="h-full flex flex-col text-slate-800 bg-slate-100 overflow-x-hidden">
 
     <!-- Landing Page (الصفحة الأولى) -->
-    <div id="landingPage" class="min-h-screen flex flex-col bg-white max-w-sm mx-auto w-full shadow-md select-none">
+    <div id="landingPage" class="min-h-screen flex flex-col bg-white max-w-sm mx-auto w-full shadow-md select-none no-print">
         
         <!-- Top Bar الأبيض -->
         <div class="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shadow-xs">
@@ -288,16 +336,31 @@
                         <span>Extraire & Structurer avec IA</span>
                     </button>
                 </div>
+
+                <!-- بطاقة إرشادية للتعديل اليدوي -->
+                <div class="bg-purple-50 border border-purple-200 rounded-xl p-3 text-xs text-purple-900 space-y-1">
+                    <div class="font-bold flex items-center gap-1.5">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        <span>Édition directe activée</span>
+                    </div>
+                    <p class="text-[11px] leading-relaxed text-purple-800">
+                        Cliquez directement sur n'importe quel texte dans l'aperçu pour corriger un mot ou appuyez sur <strong>Entrée</strong> pour ajouter un retour à la ligne avant d'imprimer.
+                    </p>
+                </div>
             </section>
 
             <section class="lg:col-span-8 flex flex-col space-y-3">
                 <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-2 no-print">
                     <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                         <i class="fa-solid fa-eye text-purple-600"></i>
-                        Aperçu (A4 Portrait) - <span class="text-xs text-purple-600">Glissez ou redimensionnez les figures</span>
+                        <span>Aperçu modifiable (A4)</span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                        <button onclick="reRenderMath()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 transition" title="Actualiser les formules mathématiques après modification">
+                            <i class="fa-solid fa-square-root-variable text-purple-600"></i>
+                            <span>Actualiser Maths</span>
+                        </button>
+                        <button onclick="printFiche()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
                             <i class="fa-solid fa-print text-sm"></i>
                             <span>Imprimer fiche pdf</span>
                         </button>
@@ -305,16 +368,16 @@
                 </div>
 
                 <div class="bg-white rounded-xl shadow-lg border border-slate-300 p-4 print-container w-full overflow-x-auto">
-                    <!-- الترويسة -->
+                    <!-- الترويسة القابلة للتعديل -->
                     <div class="border-2 border-slate-800 mb-3 p-2 text-xs">
                         <div class="grid grid-cols-3 text-center font-bold border-b border-slate-800 pb-1 mb-1">
-                            <div>Niveau: 2ème APIC</div>
-                            <div>Matière: Mathématiques</div>
-                            <div>Fiche Pédagogique</div>
+                            <div contenteditable="true">Niveau: 2ème APIC</div>
+                            <div contenteditable="true">Matière: Mathématiques</div>
+                            <div contenteditable="true">Fiche Pédagogique</div>
                         </div>
                         <div class="grid grid-cols-2 text-slate-700">
-                            <div><strong>Leçon:</strong> ________________</div>
-                            <div class="text-right"><strong>Professeur:</strong> ________________</div>
+                            <div contenteditable="true"><strong>Leçon:</strong> ________________</div>
+                            <div contenteditable="true" class="text-right"><strong>Professeur:</strong> ________________</div>
                         </div>
                     </div>
 
@@ -330,16 +393,16 @@
                         </thead>
                         <tbody id="ficheTableBody">
                             <tr>
-                                <td class="text-center font-semibold col-seance">1</td>
-                                <td class="text-center col-duree"></td>
-                                <td id="cell-content-1" class="col-contenu py-4">
+                                <td contenteditable="true" class="text-center font-semibold col-seance">1</td>
+                                <td contenteditable="true" class="text-center col-duree"></td>
+                                <td id="cell-content-1" contenteditable="true" class="col-contenu py-4">
                                     <div class="text-slate-400 text-center py-4 font-medium text-xs">
                                         <i class="fa-solid fa-file-arrow-up text-2xl mb-1 text-slate-300 block"></i>
                                         Veuillez charger un fichier ou saisir le contenu.
                                     </div>
                                 </td>
-                                <td class="text-slate-600 col-role-ens"></td>
-                                <td class="text-slate-600 col-role-app"></td>
+                                <td contenteditable="true" class="text-slate-600 col-role-ens"></td>
+                                <td contenteditable="true" class="text-slate-600 col-role-app"></td>
                             </tr>
                         </tbody>
                     </table>
@@ -349,7 +412,7 @@
     </div>
 
     <!-- Settings Modal -->
-    <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+   <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
         <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-4 space-y-3">
             <h3 class="font-bold text-slate-800 text-xs">Clé API Gemini</h3>
             <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full p-2 text-xs border rounded-lg">
@@ -361,7 +424,7 @@
     </div>
 
     <!-- Loader Modal -->
-    <div id="loadingModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 hidden text-white">
+    <div id="loadingModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 hidden text-white no-print">
         <i class="fa-solid fa-circle-notch fa-spin text-3xl text-purple-400 mb-2"></i>
         <h4 class="font-bold text-xs" id="loadingTitle">Analyse en cours...</h4>
         <p class="text-[11px] text-slate-300 mt-1" id="loadingStatus">Extraction intelligente...</p>
@@ -483,11 +546,11 @@
                     if (aiResult.box) {
                         const croppedBase64 = await cropByBoundingBox(fullBase64Image, aiResult.box);
                         const figureHTML = `
-                            <div class="figure-wrapper">
+                            <div class="figure-wrapper" contenteditable="false">
                                 <img src="${croppedBase64}" class="detected-figure" alt="Figure / Schéma">
                                 <div class="figure-toolbar no-print">
-                                    <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
-                                    <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                                    <button type="button" onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                                    <button type="button" onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
                                 </div>
                             </div>`;
                         
@@ -499,7 +562,7 @@
                     }
 
                     if (pageHTML.trim()) {
-                        combinedResultHTML += `<div class="mb-6 pb-2 border-b border-slate-200">${pageHTML}</div>`;
+                        combinedResultHTML += `<div class="mb-4 pb-2 border-b border-slate-200">${pageHTML}</div>`;
                     }
                 } catch (pageErr) {
                     console.error(`Erreur sur la page ${i}:`, pageErr);
@@ -514,7 +577,6 @@
 
             applyParsedContentToFiche(combinedResultHTML);
         }
-
         function resizeFigure(btn, delta) {
             const wrapper = btn.closest('.figure-wrapper');
             const img = wrapper.querySelector('.detected-figure');
@@ -558,11 +620,11 @@
             if (aiResult.box) {
                 const croppedBase64 = await cropByBoundingBox(base64Data, aiResult.box);
                 const figureHTML = `
-                    <div class="figure-wrapper">
+                    <div class="figure-wrapper" contenteditable="false">
                         <img src="${croppedBase64}" class="detected-figure" alt="Figure / Schéma">
                         <div class="figure-toolbar no-print">
-                            <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
-                            <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                            <button type="button" onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                            <button type="button" onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
                         </div>
                     </div>`;
                 if (parsedHTML.includes("[FIGURE_PLACEHOLDER]")) {
@@ -597,11 +659,11 @@
                     if (aiResult.box) {
                         const croppedBase64 = await cropByBoundingBox(b64, aiResult.box);
                         const figureHTML = `
-                            <div class="figure-wrapper">
+                            <div class="figure-wrapper" contenteditable="false">
                                 <img src="${croppedBase64}" class="detected-figure" alt="Figure">
                                 <div class="figure-toolbar no-print">
-                                    <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
-                                    <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                                    <button type="button" onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                                    <button type="button" onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
                                 </div>
                             </div>`;
                         if (res.includes("[FIGURE_PLACEHOLDER]")) {
@@ -688,6 +750,21 @@
                 await window.MathJax.typesetPromise([cell1]);
             }
             initDragAndDropForFigures();
+        }
+
+        function reRenderMath() {
+            const cell1 = document.getElementById('cell-content-1');
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                window.MathJax.typesetPromise([cell1]);
+            }
+        }
+
+        function printFiche() {
+            // إزالة التركيز عن أي خلية قيد التعديل قبل الطباعة
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
+            window.print();
         }
 
         function initDragAndDropForFigures() {
