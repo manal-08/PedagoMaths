@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PédagoMath - Générateur de Fiches Pédagogiques</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- MathJax for rendering LaTeX -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true
+            },
+            svg: { fontCache: 'global' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+    <!-- JSZip for PPTX Parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- PDF.js for rendering PDF slides/pages into images -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'pedagogy-roman': '#DC2626',
+                        'pedagogy-arabic': '#16A34A',
+                        'pedagogy-cyan': '#0284C7',
+                        'pedagogy-orange': '#EA580C',
+                        'pedagogy-purple': '#9333EA',
+                        'pedagogy-red': '#DC2626',
+                        'pedagogy-brown': '#78350F',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+
+        .fiche-table {
+            width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+        }
+
+        .fiche-table th, .fiche-table td {
+            border: 1px solid #334155 !important;
+            padding: 8px 6px !important;
+            vertical-align: top !important;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            font-size: 0.9rem !important;
+            line-height: 1.45 !important;
+        }
+
+        .col-seance { width: 8% !important; }
+        .col-duree { width: 8% !important; }
+        .col-contenu { width: 52% !important; }
+        .col-role-ens { width: 16% !important; }
+        .col-role-app { width: 16% !important; }
+
+        /* الألوان والبيداغوجيا المطلوبة بدقة مع الرجوع الإجباري للسطر */
+        .ped-rule { color: #9333EA !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-prop { color: #EA580C !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-act { color: #0284C7 !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-roman { color: #DC2626 !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-num-bracket { color: #16A34A !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-normal { color: #000000 !important; }
+        .ped-cas { color: #65A30D !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-app { color: #DC2626 !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-rem { color: #78350F !important; font-weight: bold; display: block; margin-top: 6px; }
+        .ped-def-ex { color: #0284C7 !important; font-weight: bold; display: block; margin-top: 6px; }
+
+        /* ضبط محاذاة رموز MathJax مع السطر لمنع ارتفاع [AB] والحروف */
+        mjx-container {
+            display: inline-block !important;
+            margin: 0 2px !important;
+            max-width: 100% !important;
+            overflow-x: auto !important;
+            vertical-align: -0.12em !important;
+        }
+
+        mjx-container[jax="SVG"] {
+            vertical-align: -0.15em !important;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            .print-container { width: 100% !important; margin: 0 !important; box-shadow: none !important; border: none !important; padding: 0 !important; }
+            @page { size: A4 portrait; margin: 8mm; }
+            
+            .fiche-table {
+                width: 100% !important;
+                table-layout: fixed !important;
+            }
+
+            .fiche-table th, .fiche-table td { 
+                font-size: 10px !important; 
+                line-height: 1.35 !important;
+                padding: 4px 3px !important;
+                word-break: break-word !important;
+                overflow: hidden !important;
+            }
+
+            .col-seance { width: 8% !important; }
+            .col-duree { width: 8% !important; }
+            .col-contenu { width: 52% !important; }
+            .col-role-ens { width: 16% !important; }
+            .col-role-app { width: 16% !important; }
+
+            /* إصلاح تداخل المعادلات والرموز الرياضية ومحاذاة السطر في الطباعة */
+            mjx-container {
+                max-width: 100% !important;
+                white-space: normal !important;
+                overflow: visible !important;
+                vertical-align: -0.12em !important;
+            }
+
+            .figure-wrapper {
+                max-width: 100% !important;
+                page-break-inside: avoid;
+            }
+
+            .detected-figure {
+                max-width: 55% !important;
+                height: auto !important;
+            }
+
+            .figure-toolbar { display: none !important; }
+        }
+
+        .figure-wrapper {
+            position: relative;
+            display: inline-block;
+            margin: 10px auto;
+            text-align: center;
+            width: 100%;
+        }
+
+        .detected-figure {
+            width: 65%;
+            height: auto;
+            margin: 0 auto;
+            border: 2px dashed #94a3b8;
+            border-radius: 8px;
+            display: block;
+            background: #ffffff;
+            padding: 4px;
+            cursor: grab;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            touch-action: none;
+            user-select: none;
+            transition: width 0.1s ease;
+        }
+        .detected-figure:active {
+            cursor: grabbing;
+            border-color: #9333EA;
+        }
+
+        .figure-toolbar {
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col text-slate-800 bg-slate-100 overflow-x-hidden">
+
+    <!-- Landing Page (الصفحة الأولى) -->
+    <div id="landingPage" class="min-h-screen flex flex-col bg-white max-w-sm mx-auto w-full shadow-md select-none">
+        
+        <!-- Top Bar الأبيض -->
+        <div class="px-4 py-3 bg-white border-b border-slate-100 flex items-center justify-between shadow-xs">
+            <div class="flex items-center space-x-2.5 rtl:space-x-reverse">
+                <div class="bg-purple-50 p-2 rounded-xl text-purple-600 shadow-xs">
+                    <i class="fa-solid fa-compass-drafting text-lg"></i>
+                </div>
+                <span class="font-bold text-lg text-slate-800 tracking-tight">PédagoMath</span>
+            </div>
+            <div class="text-purple-600 font-bold text-xl px-2">
+                <span>∑</span>
+            </div>
+        </div>
+
+        <!-- محتوى الصفحة الأولى -->
+        <div class="flex-1 flex flex-col items-center justify-center p-5 space-y-5">
+            
+            <!-- نص الترحيب في الأعلى -->
+            <div class="text-center w-full">
+                <p class="text-slate-700 text-xs sm:text-sm font-semibold">
+                    Choisissez votre fiche pour commencer à réviser ⭐
+                </p>
+            </div>
+
+            <!-- البطاقات المربعة المتناسقة -->
+            <div class="w-full space-y-4 max-w-[260px]">
+                
+                <!-- بطاقة Fiche Géométrique -->
+                <div onclick="selectCardTheme('geometrie')" class="w-full aspect-square bg-[#9333EA] hover:bg-purple-800 text-white p-5 rounded-2xl shadow-lg cursor-pointer transition transform active:scale-95 flex flex-col items-center justify-center space-y-3">
+                    <div class="bg-white/20 p-3 rounded-xl shadow-inner text-white text-3xl">
+                        <i class="fa-solid fa-compass-drafting"></i>
+                    </div>
+                    <span class="font-bold text-sm sm:text-base tracking-wide text-center">Fiche Géométrique</span>
+                </div>
+
+                <!-- بطاقة Fiche Algébrique -->
+                <div onclick="selectCardTheme('algebre')" class="w-full aspect-square bg-[#D97706] hover:bg-amber-700 text-white p-5 rounded-2xl shadow-lg cursor-pointer transition transform active:scale-95 flex flex-col items-center justify-center space-y-3">
+                    <div class="bg-white/20 p-3 rounded-xl shadow-inner text-white text-3xl">
+                        <i class="fa-solid fa-square-root-variable"></i>
+                    </div>
+                    <span class="font-bold text-sm sm:text-base tracking-wide text-center">Fiche Algébrique</span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Generator Interface (Hidden by default) -->
+    <div id="generatorApp" class="hidden min-h-full flex-col flex">
+        <header id="appHeader" class="text-white shadow-md no-print transition-colors duration-300 bg-purple-600">
+            <div class="max-w-7xl mx-auto px-4 py-2.5 flex justify-between items-center">
+                <div class="flex items-center space-x-3 rtl:space-x-reverse">
+                    <button onclick="goBackToLanding()" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95">
+                        <i class="fa-solid fa-house"></i>
+                        <span>Retour à l'accueil</span>
+                    </button>
+                    <div>
+                        <h1 id="headerTitle" class="font-bold text-sm leading-tight">Fiche Géométrique</h1>
+                    </div>
+                </div>
+                <button onclick="toggleSettingsModal()" class="bg-white/10 hover:bg-white/20 text-white px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 border border-white/20">
+                    <i class="fa-solid fa-key text-yellow-300"></i>
+                    <span class="hidden sm:inline">Clé API</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+            <section class="lg:col-span-4 space-y-3 no-print">
+                <div id="apiKeyNotice" class="bg-amber-50 border-l-4 border-amber-500 p-2.5 rounded text-xs text-amber-800 flex justify-between items-center">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600 text-sm"></i>
+                        <span><strong>Clé API requise:</strong> OCR IA.</span>
+                    </div>
+                    <button onclick="toggleSettingsModal()" class="underline font-semibold ml-2">Saisir</button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-3.5">
+                    <h2 class="font-bold text-slate-700 mb-2.5 flex items-center gap-2 text-xs">
+                        <i class="fa-solid fa-file-import text-purple-600"></i>
+                        Charger vos documents
+                    </h2>
+
+                    <div class="border-2 border-dashed border-purple-200 hover:border-purple-500 bg-purple-50/50 rounded-xl p-3 text-center cursor-pointer transition relative" id="dropZone">
+                        <input type="file" id="fileInput" accept=".pdf, .pptx, image/*" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onchange="handleFileSelect(event)">
+                        <i class="fa-solid fa-cloud-arrow-up text-2xl text-purple-500 mb-1"></i>
+                        <p class="text-xs font-semibold text-purple-900">Importer PDF, PPTX ou Image</p>
+                    </div>
+
+                    <div id="fileInfo" class="hidden mt-2.5 p-2 bg-purple-50 rounded border border-purple-200 text-xs flex justify-between items-center">
+                        <span id="fileName" class="font-medium text-purple-900 truncate max-w-[180px]">document.pdf</span>
+                        <span id="fileSize" class="text-purple-600 font-mono text-xs">2.4 MB</span>
+                    </div>
+
+                    <button id="processBtn" onclick="processUploadedFile()" disabled class="w-full mt-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 text-xs">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Extraire & Structurer avec IA</span>
+                    </button>
+                </div>
+            </section>
+
+            <section class="lg:col-span-8 flex flex-col space-y-3">
+                <div class="bg-white p-2.5 rounded-xl shadow-sm border border-slate-200 flex flex-wrap justify-between items-center gap-2 no-print">
+                    <div class="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <i class="fa-solid fa-eye text-purple-600"></i>
+                        Aperçu (A4 Portrait) - <span class="text-xs text-purple-600">Glissez ou redimensionnez les figures</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="window.print()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+                            <i class="fa-solid fa-print text-sm"></i>
+                            <span>Imprimer fiche pdf</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-lg border border-slate-300 p-4 print-container w-full overflow-x-auto">
+                    <!-- الترويسة -->
+                    <div class="border-2 border-slate-800 mb-3 p-2 text-xs">
+                        <div class="grid grid-cols-3 text-center font-bold border-b border-slate-800 pb-1 mb-1">
+                            <div>Niveau: 2ème APIC</div>
+                            <div>Matière: Mathématiques</div>
+                            <div>Fiche Pédagogique</div>
+                        </div>
+                        <div class="grid grid-cols-2 text-slate-700">
+                            <div><strong>Leçon:</strong> ________________</div>
+                            <div class="text-right"><strong>Professeur:</strong> ________________</div>
+                        </div>
+                    </div>
+
+                    <table class="fiche-table">
+                        <thead>
+                            <tr class="bg-slate-100 font-bold text-slate-800 text-center">
+                                <th class="col-seance">Séance</th>
+                                <th class="col-duree">Durée</th>
+                                <th class="col-contenu">Contenu de la Leçon</th>
+                                <th class="col-role-ens">Rôle enseignant</th>
+                                <th class="col-role-app">Rôle apprenant</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ficheTableBody">
+                            <tr>
+                                <td class="text-center font-semibold col-seance">1</td>
+                                <td class="text-center col-duree"></td>
+                                <td id="cell-content-1" class="col-contenu py-4">
+                                    <div class="text-slate-400 text-center py-4 font-medium text-xs">
+                                        <i class="fa-solid fa-file-arrow-up text-2xl mb-1 text-slate-300 block"></i>
+                                        Veuillez charger un fichier ou saisir le contenu.
+                                    </div>
+                                </td>
+                                <td class="text-slate-600 col-role-ens"></td>
+                                <td class="text-slate-600 col-role-app"></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-4 space-y-3">
+            <h3 class="font-bold text-slate-800 text-xs">Clé API Gemini</h3>
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full p-2 text-xs border rounded-lg">
+            <div class="flex gap-2 justify-end">
+                <button onclick="toggleSettingsModal()" class="px-3 py-1.5 text-xs text-slate-600">Annuler</button>
+                <button onclick="saveApiKey()" class="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg font-semibold">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loader Modal -->
+    <div id="loadingModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex flex-col items-center justify-center p-4 hidden text-white">
+        <i class="fa-solid fa-circle-notch fa-spin text-3xl text-purple-400 mb-2"></i>
+        <h4 class="font-bold text-xs" id="loadingTitle">Analyse en cours...</h4>
+        <p class="text-[11px] text-slate-300 mt-1" id="loadingStatus">Extraction intelligente...</p>
+    </div>
+
+    <script>
+        let currentFile = null;
+        let userApiKey = localStorage.getItem('gemini_pedagogy_apikey') || '';
+        let pdfDataArrayBuffer = null;
+        let selectedLessonType = 'geometrie';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (userApiKey) {
+                document.getElementById('apiKeyInput').value = userApiKey;
+                document.getElementById('apiKeyNotice').classList.add('hidden');
+            }
+        });
+
+        function selectCardTheme(type) {
+            selectedLessonType = type;
+            const landing = document.getElementById('landingPage');
+            const app = document.getElementById('generatorApp');
+            const header = document.getElementById('appHeader');
+            const headerTitle = document.getElementById('headerTitle');
+            const processBtn = document.getElementById('processBtn');
+
+            landing.classList.add('hidden');
+            app.classList.remove('hidden');
+            app.classList.add('flex');
+
+            if (type === 'geometrie') {
+                header.className = "text-white shadow-md no-print transition-colors duration-300 bg-purple-600";
+                headerTitle.innerText = "Fiche Géométrique";
+                processBtn.className = "w-full mt-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 text-xs";
+            } else {
+                header.className = "text-white shadow-md no-print transition-colors duration-300 bg-amber-600";
+                headerTitle.innerText = "Fiche Algébrique";
+                processBtn.className = "w-full mt-3 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-300 text-white font-semibold py-2 px-3 rounded-lg shadow-sm transition flex items-center justify-center gap-1.5 text-xs";
+            }
+        }
+
+        function goBackToLanding() {
+            document.getElementById('generatorApp').classList.add('hidden');
+            document.getElementById('generatorApp').classList.remove('flex');
+            document.getElementById('landingPage').classList.remove('hidden');
+        }
+
+        function toggleSettingsModal() {
+            document.getElementById('settingsModal').classList.toggle('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('apiKeyInput').value.trim();
+            userApiKey = key;
+            localStorage.setItem('gemini_pedagogy_apikey', key);
+            toggleSettingsModal();
+            if (key) document.getElementById('apiKeyNotice').classList.add('hidden');
+        }
+
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            currentFile = file;
+            document.getElementById('fileName').innerText = file.name;
+            document.getElementById('fileSize').innerText = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
+            document.getElementById('fileInfo').classList.remove('hidden');
+            document.getElementById('processBtn').disabled = false;
+
+            if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                pdfDataArrayBuffer = await file.arrayBuffer();
+            } else {
+                pdfDataArrayBuffer = null;
+            }
+        }
+
+        async function processUploadedFile() {
+            if (!currentFile || !userApiKey) return;
+            showLoader("Traitement", "Analyse par le moteur IA...");
+
+            try {
+                if (currentFile.type === 'application/pdf' || currentFile.name.endsWith('.pdf')) {
+                    await processAllPDFPagesRecursively();
+                } else if (currentFile.type.startsWith('image/')) {
+                    await processImageFile(currentFile);
+                } else if (currentFile.name.endsWith('.pptx')) {
+                    await processPPTXFile(currentFile);
+                }
+            } catch (err) {
+                alert("Erreur: " + err.message);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function processAllPDFPagesRecursively() {
+            if (!pdfDataArrayBuffer) return;
+            const loadingTask = pdfjsLib.getDocument({ data: pdfDataArrayBuffer });
+            const pdfDoc = await loadingTask.promise;
+            const maxPages = pdfDoc.numPages;
+            const startPage = maxPages > 1 ? 2 : 1;
+            let combinedResultHTML = "";
+
+            for (let i = startPage; i <= maxPages; i++) {
+                updateLoaderStatus(`Analyse de la page ${i} sur ${maxPages}...`);
+                const page = await pdfDoc.getPage(i);
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context, viewport: viewport }).promise;
+                const fullBase64Image = canvas.toDataURL('image/png');
+
+                try {
+                    const aiResult = await callGeminiVisionWithBoundingBox(fullBase64Image, 'image/png');
+                    let pageHTML = aiResult.html || "";
+
+                    if (aiResult.box) {
+                        const croppedBase64 = await cropByBoundingBox(fullBase64Image, aiResult.box);
+                        const figureHTML = `
+                            <div class="figure-wrapper">
+                                <img src="${croppedBase64}" class="detected-figure" alt="Figure / Schéma">
+                                <div class="figure-toolbar no-print">
+                                    <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                                    <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                                </div>
+                            </div>`;
+                        
+                        if (pageHTML.includes("[FIGURE_PLACEHOLDER]")) {
+                            pageHTML = pageHTML.replace("[FIGURE_PLACEHOLDER]", figureHTML);
+                        } else {
+                            pageHTML += figureHTML;
+                        }
+                    }
+
+                    if (pageHTML.trim()) {
+                        combinedResultHTML += `<div class="mb-6 pb-2 border-b border-slate-200">${pageHTML}</div>`;
+                    }
+                } catch (pageErr) {
+                    console.error(`Erreur sur la page ${i}:`, pageErr);
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
+            if (!combinedResultHTML.trim()) {
+                combinedResultHTML = "<p class='text-slate-500 italic'>Aucun contenu textuel détecté sur ces pages.</p>";
+            }
+
+            applyParsedContentToFiche(combinedResultHTML);
+        }
+
+        function resizeFigure(btn, delta) {
+            const wrapper = btn.closest('.figure-wrapper');
+            const img = wrapper.querySelector('.detected-figure');
+            let currentWidth = parseFloat(img.style.width) || 65;
+            let newWidth = currentWidth + delta;
+            if (newWidth < 20) newWidth = 20;
+            if (newWidth > 100) newWidth = 100;
+            img.style.width = newWidth + '%';
+        }
+
+        function cropByBoundingBox(dataUri, box) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+         
+                    const ymin = Math.max(0, (box[0] / 1000) * img.height - 10);
+                    const xmin = Math.max(0, (box[1] / 1000) * img.width - 10);
+                    const ymax = Math.min(img.height, (box[2] / 1000) * img.height + 10);
+                    const xmax = Math.min(img.width, (box[3] / 1000) * img.width + 10);
+
+                    const sw = xmax - xmin;
+                    const sh = ymax - ymin;
+
+                    canvas.width = sw;
+                    canvas.height = sh;
+                    ctx.drawImage(img, xmin, ymin, sw, sh, 0, 0, sw, sh);
+                    resolve(canvas.toDataURL('image/png'));
+                };
+                img.src = dataUri;
+            });
+        }
+
+        async function processImageFile(file) {
+            const base64Data = await fileToBase64(file);
+            updateLoaderStatus("Analyse IA Vision...");
+            const aiResult = await callGeminiVisionWithBoundingBox(base64Data, file.type);
+            let parsedHTML = aiResult.html || "";
+
+            if (aiResult.box) {
+                const croppedBase64 = await cropByBoundingBox(base64Data, aiResult.box);
+                const figureHTML = `
+                    <div class="figure-wrapper">
+                        <img src="${croppedBase64}" class="detected-figure" alt="Figure / Schéma">
+                        <div class="figure-toolbar no-print">
+                            <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                            <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                        </div>
+                    </div>`;
+                if (parsedHTML.includes("[FIGURE_PLACEHOLDER]")) {
+                    parsedHTML = parsedHTML.replace("[FIGURE_PLACEHOLDER]", figureHTML);
+                } else {
+                    parsedHTML += figureHTML;
+                }
+            }
+
+            applyParsedContentToFiche(parsedHTML);
+        }
+
+        async function processPPTXFile(file) {
+            const zip = new JSZip();
+            const zipContent = await zip.loadAsync(file);
+            let imageFiles = [];
+
+            for (let path in zipContent.files) {
+                if (path.startsWith("ppt/media/") && /\.(png|jpeg|jpg)$/i.test(path)) {
+                    imageFiles.push(await zipContent.files[path].async("blob"));
+                }
+            }
+
+            if (imageFiles.length > 0) {
+                let aiContent = "";
+                const startIdx = imageFiles.length > 1 ? 1 : 0;
+                for (let i = startIdx; i < imageFiles.length; i++) {
+                    const b64 = await fileToBase64(imageFiles[i]);
+                    const aiResult = await callGeminiVisionWithBoundingBox(b64, imageFiles[i].type);
+                    let res = aiResult.html || "";
+
+                    if (aiResult.box) {
+                        const croppedBase64 = await cropByBoundingBox(b64, aiResult.box);
+                        const figureHTML = `
+                            <div class="figure-wrapper">
+                                <img src="${croppedBase64}" class="detected-figure" alt="Figure">
+                                <div class="figure-toolbar no-print">
+                                    <button onclick="resizeFigure(this, 10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-plus"></i> Agrandir</button>
+                                    <button onclick="resizeFigure(this, -10)" class="bg-slate-700 hover:bg-slate-800 text-white px-2 py-0.5 rounded text-[10px] font-bold"><i class="fa-solid fa-minus"></i> Réduire</button>
+                                </div>
+                            </div>`;
+                        if (res.includes("[FIGURE_PLACEHOLDER]")) {
+                            res = res.replace("[FIGURE_PLACEHOLDER]", figureHTML);
+                        } else {
+                            res += figureHTML;
+                        }
+                    }
+
+                    aiContent += `<div class="mb-4">${res}</div>`;
+                }
+                applyParsedContentToFiche(aiContent);
+            }
+        }
+
+        async function callGeminiVisionWithBoundingBox(base64Image, mimeType) {
+            const prompt = `Vous êtes un expert en pédagogie des mathématiques.
+            Analysez cette page et extrayez tout le contenu textuel en HTML propre en respectant STRICTEMENT l'ordre chronologique et séquentiel des paragraphes. NE RETOURNEZ AUCUN CROCHET VIDE de type "[]". 
+            
+            Règles essentielles :
+            1. Retour à la ligne obligatoire : Chaque fois que vous rencontrez un des éléments suivants, vous DEVEZ obligatoirement forcer un retour à la ligne :
+               - Les mots clés : "remarque", "activité", "définition", "exemple", "application", "cas particulier", "propriété", "règle".
+               - Les phrases ou sections qui commencent par des chiffres romains (I, II, III, IV...).
+               - Les phrases ou éléments qui commencent par un CHIFFRE normal suivi d'une parenthèse fermante (ex: 1), 2), 3)...). ATTENTION : Ne confondez JAMAIS les chiffres (1, 2...) avec les lettres (a, b, c...). Les lettres comme a), b), c) ne doivent PAS être colorées en vert et doivent rester dans la classe normale (<span class="ped-normal">).
+            2. Formatage MathJax / LaTeX : Convertissez toutes les mathématiques en LaTeX avec des délimiteurs $...$. N'écrivez JAMAIS \\quad ou \\qquad en dehors des délimiteurs $...$ (utilisez plutôt des espaces HTML &nbsp;&nbsp; entre deux blocs $...$ séparés).
+
+            Appliquez STRICTEMENT les classes CSS de formatage suivantes :
+            - Enveloppez les blocs "Règle" avec <span class="ped-rule">...</span>.
+            - Enveloppez "Propriété" avec <span class="ped-prop">...</span>.
+            - Enveloppez "Activité" avec <span class="ped-act">...</span>.
+            - Enveloppez les phrases contenant des chiffres romains (I, II, III, IV...) avec <span class="ped-roman">...</span>.
+            - Enveloppez UNIQUEMENT les phrases, questions ou items commençant par un CHIFFRE normal suivi d'une parenthèse fermante (1), 2), 3)...) avec <span class="ped-num-bracket">...</span>. (Interdit pour les lettres a), b), c)).
+            - Enveloppez "Exemple" ou "Définition" avec <span class="ped-def-ex">...</span>.
+            - Enveloppez "Application" avec <span class="ped-app">...</span>.
+            - Enveloppez "Remarque" avec <span class="ped-rem">...</span>.
+            - Enveloppez "Cas particulier" avec <span class="ped-cas">...</span>.
+            - Enveloppez les paragraphes ordinaires (y compris les sous-questions avec lettres a), b), c) et les expressions mathématiques) avec <span class="ped-normal">...</span>.
+            - SI UN SCHEMA, UNE FIGURE GEOMETRIQUE OU UNE SCHÉMATISATION/DIAGRAMME EST PRESENT :
+              Placez exactement la balise [FIGURE_PLACEHOLDER] dans le flux HTML à l'endroit exact, et fournissez les coordonnées exactes [ymin, xmin, ymax, xmax] (0 à 1000) à la fin de votre réponse.
+            Retournez le HTML formaté, puis l'array du bounding box si une figure existe.`;
+
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${userApiKey}`;
+            const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [
+                            { text: prompt },
+                            { inlineData: { mimeType: mimeType || "image/png", data: cleanBase64 } }
+                        ]
+                    }]
+                })
+            });
+
+            const result = await response.json();
+            let rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            
+            let box = null;
+            const boxMatch = rawText.match(/\[\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\]/);
+            if (boxMatch) {
+                box = [parseInt(boxMatch[1]), parseInt(boxMatch[2]), parseInt(boxMatch[3]), parseInt(boxMatch[4])];
+                rawText = rawText.replace(boxMatch[0], '');
+            }
+
+            let htmlOutput = rawText
+                .replace(/```html/g, '')
+                .replace(/```json[\s\S]*?```/g, '')
+                .replace(/\[\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\]/g, '')
+                .replace(/^\[\s*\]$/gm, '')
+                .replace(/```/g, '')
+                .replace(/\\q?quad/g, ' &nbsp;&nbsp; ')
+                .trim();
+
+            return { html: htmlOutput, box: box };
+        }
+
+        async function applyParsedContentToFiche(htmlContent) {
+            const cell1 = document.getElementById('cell-content-1');
+            cell1.innerHTML = htmlContent;
+            if (window.MathJax && window.MathJax.typesetPromise) {
+                await window.MathJax.typesetPromise([cell1]);
+            }
+            initDragAndDropForFigures();
+        }
+
+        function initDragAndDropForFigures() {
+            const wrappers = document.querySelectorAll('.figure-wrapper');
+            wrappers.forEach(wrapper => {
+                const fig = wrapper.querySelector('.detected-figure');
+                let isDragging = false;
+                let startX, startY;
+
+                fig.onmousedown = dragStart;
+                fig.ontouchstart = dragStart;
+
+                function dragStart(e) {
+                    isDragging = true;
+                    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+                    startX = clientX;
+                    startY = clientY;
+
+                    fig.style.position = 'relative';
+                    document.onmousemove = drag;
+                    document.onmouseup = dragEnd;
+                    document.ontouchmove = drag;
+                    document.ontouchend = dragEnd;
+                }
+
+                function drag(e) {
+                    if (!isDragging) return;
+                    const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+                    const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+                    
+                    const dx = clientX - startX;
+                    const dy = clientY - startY;
+
+                    fig.style.transform = `translate(${dx}px, ${dy}px)`;
+                }
+
+                function dragEnd() {
+                    isDragging = false;
+                    document.onmousemove = null;
+                    document.onmouseup = null;
+                    document.ontouchmove = null;
+                    document.ontouchend = null;
+                }
+            });
+        }
+
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        }
+
+        function showLoader(title, status) {
+            document.getElementById('loadingTitle').innerText = title;
+            document.getElementById('loadingStatus').innerText = status;
+            document.getElementById('loadingModal').classList.remove('hidden');
+        }
+
+        function updateLoaderStatus(status) {
+            document.getElementById('loadingStatus').innerText = status;
+        }
+
+        function hideLoader() {
+            document.getElementById('loadingModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
